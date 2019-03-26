@@ -1,9 +1,11 @@
+const mysqlServer = require('./lib/src/modules/mysql_server.js');
+
 const puppeteer = require('puppeteer');
 const url = 'https://eosflare.io/token/tkcointkcoin/TKC';//源数据页面地址
 
 (async () => {
 	const browser = await (puppeteer.launch({
-		// 若是手动下载的chromium需要指定chromium地址
+		// 若是手动下载的chromium需要指定chromium地址, 默认引用地址为 /项目目录/node_modules/puppeteer/.local-chromium/
 		// executablePath: './node_modules/puppeteer/.local-chromium',
 		//设置超时时间
 		timeout: 5000,
@@ -21,13 +23,14 @@ const url = 'https://eosflare.io/token/tkcointkcoin/TKC';//源数据页面地址
 	
 	let insert_num = 0;
 	let insert_datas = [];
-
-	for (let page_num = 1; page_num <= 2; page_num++) {
+	let page_total = 15019;//总页数
+	
+	for (let page_num = 1; page_num <= page_total; page_num++) {
 	  await page.waitForSelector('#holders', {timeout: 10000});
+	  
 	  const get_data = await page.$eval('#holders', function(e){
 		let itemList = e.querySelectorAll('.layout.row.wrap')
 		const writeDataList = [];
-
 		for (let item of itemList) {
 			let writeData = {};
 
@@ -40,24 +43,32 @@ const url = 'https://eosflare.io/token/tkcointkcoin/TKC';//源数据页面地址
 
 			writeDataList.push(writeData);
 		}
-
+		
 		return writeDataList;
 	  });
 	  
-	  //写入数据库
-    //todo
-	  await page.waitFor(2000);
-	  //下一页
-    await page.click('[aria-label="Next page"]');
-	  await page.waitForSelector('#holders', {timeout: 10000});
-	  await page.waitFor(3000);
-	
-	  insert_num += get_data.length;
-	  insert_datas.push(get_data);
-	  console.log('当前页数：'+page_num);
+	    //写入数据库
+		if(page_num > 164){
+			for(let item of get_data){
+				let insertStr = "'" + item.rank + "', '" + item.account + "', '" + item.balance + "', '" + item.rate+ "'";
+				console.log('sql：'+insertStr);
+				await mysqlServer.query("INSERT INTO dt_account_balance (rank,account,balance,rate) VALUES ("+ insertStr +")");
+			}
+		}
+
+		//下一页
+		await page.type('.input-group__selections__comma', '500');
+		await page.click('[aria-label="Next page"]');
+		
+		await page.waitForSelector('#holders', {timeout: 10000});
+		await page.waitFor(3000);
+
+		insert_num += get_data.length;
+		// insert_datas.push(get_data);
+		console.log('当前页数：'+page_num);
 	}
 	
-	console.log(insert_datas);
+	// console.log(insert_datas);
 	console.log('获取数据量：'+insert_num);
 	
 	browser.close();

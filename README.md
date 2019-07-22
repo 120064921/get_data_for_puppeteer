@@ -1,2 +1,1 @@
-# get_data_for_puppeteer
-Get eos data for puppeteer
+# Using scripts developed by puppeteer
